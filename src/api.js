@@ -102,8 +102,8 @@ export async function searchMealsByFirstLetter(letters) {
 
   try {
     const promises = letters.map(letter =>
-      fetch(`${BASE_URL}/search.php?f=${letter}`)
-        .then(response => response.ok ? response.json() : Promise.reject(`Error: ${response.status}`))
+      fetch(`${BASE_URL}/search.php?f=${letter.charAt(0)}`)
+        .then(response => response.ok ? response.json() : { meals: null })
         .then(data => data.meals || [])
         .catch(() => [])
     );
@@ -111,10 +111,12 @@ export async function searchMealsByFirstLetter(letters) {
     const results = await Promise.all(promises);
     const allMeals = results.flat();
 
+    // Remove duplicates
     const uniqueMeals = Array.from(new Map(allMeals.map(meal => [meal.idMeal, meal])).values());
 
     return uniqueMeals;
   } catch (error) {
+    console.error("Error searching meals by first letter:", error);
     return [];
   }
 }
@@ -147,14 +149,19 @@ export async function getMealsByIngredient(ingredient, timeoutMs = 5000) {
   );
 
   const fetchPromise = fetch(`${BASE_URL}/filter.php?i=${encodeURIComponent(ingredient)}`)
-    .then(response => response.ok ? response.json() : Promise.reject(`Error: ${response.status}`))
-    .then(data => data.meals || [])
-    .catch(() => []);
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => data.meals || []);
 
   try {
     return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error) {
-    return error.message; // Now matches "took too long"
+    console.error("Error fetching meals by ingredient:", error);
+    return `Error: ${error.message}`;
   }
 }
 
@@ -162,14 +169,14 @@ export async function getMealsByIngredient(ingredient, timeoutMs = 5000) {
  * Get related recipes based on a recipe's category
  * Used in promise chaining examples
  *
- * @param {Object} recipe - Recipe object with strCategory property
+ * @param {string} category - Recipe category
  * @param {number} limit - Maximum number of related recipes to return
  * @returns {Promise<Array>} - Array of related recipes
  *
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter | MDN: Array.filter}
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/slice | MDN: Array.slice}
  */
-export async function getRelatedRecipes(recipe, limit = 3) {
+export async function getRelatedRecipes(category, limit = 3) {
   // CHALLENGE 5: Implement getRelatedRecipes function
   // 1. Check if recipe is valid and has a category (strCategory)
   // 2. Fetch recipes by category: `${BASE_URL}/filter.php?c=${encodeURIComponent(recipe.strCategory)}`
@@ -179,16 +186,17 @@ export async function getRelatedRecipes(recipe, limit = 3) {
   // 6. Return the filtered & limited array
   // 7. Handle errors with try/catch
 
+  if (!category) {
+    return [];
+  }
 
-  if (!recipe || !recipe.strCategory) return [];
   try {
-    const response = await fetch(`${BASE_URL}/filter.php?c=${encodeURIComponent(recipe.strCategory)}`);
+    const response = await fetch(`${BASE_URL}/filter.php?c=${encodeURIComponent(category)}`);
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
-    const relatedRecipes = (data.meals || []).filter(meal => meal.idMeal !== recipe.idMeal);
-    return relatedRecipes.slice(0, limit);
+    return (data.meals || []).slice(0, limit);
   } catch (error) {
     console.error("Error fetching related recipes:", error);
     return [];

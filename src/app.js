@@ -25,8 +25,11 @@ async function initialize() {
   // 4. Catch any errors, log them, and return false
 
   try {
-    await Promise.all([cache.initialize(), favorites.initialize()]);
-    cache.clearExpired();
+    await Promise.all([
+      cache.initializeCache(),
+      favorites.initializeFavorites()
+    ]);
+    await cache.clearExpiredCache();
     return true;
   } catch (error) {
     console.error('Error initializing application:', error.message);
@@ -100,7 +103,7 @@ async function viewRecipeDetails(recipeId) {
 
     console.log(utils.formatRecipe(recipeDetails));
 
-    const isFavorite = await favorites.isFavorite(recipeId);
+    const isFavorite = await favorites.isInFavorites(recipeId);
 
     if (isFavorite) {
       const removeFavorite = readlineSync.keyInYNStrict('This recipe is in your favorites. Would you like to remove it?');
@@ -114,7 +117,7 @@ async function viewRecipeDetails(recipeId) {
       }
     }
 
-    const relatedRecipes = await api.getRelatedMeals(recipeDetails.strCategory);
+    const relatedRecipes = await api.getRelatedRecipes(recipeDetails.strCategory);
     console.log('Related Recipes:');
     console.log(utils.formatRecipeList(relatedRecipes));
   } catch (error) {
@@ -154,6 +157,7 @@ async function exploreByFirstLetter() {
     console.error('Error exploring recipes by first letter:', error.message);
   }
 }
+
 /**
  * Search recipes by ingredient with timeout
  * Demonstrates using Promise.race for timeout
@@ -190,6 +194,7 @@ async function searchByIngredient() {
     console.error('Error searching by ingredient:', error.message);
   }
 }
+
 /**
  * View favorite recipes
  */
@@ -242,7 +247,7 @@ async function discoverRandom() {
 
     console.log(utils.formatRecipe(randomRecipe));
 
-    const isFavorite = await favorites.isFavorite(randomRecipe.idMeal);
+    const isFavorite = await favorites.isInFavorites(randomRecipe.idMeal);
 
     if (isFavorite) {
       const removeFavorite = readlineSync.keyInYNStrict('This recipe is in your favorites. Would you like to remove it?');
@@ -313,29 +318,16 @@ async function showMainMenu() {
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch | MDN: Promise.catch}
  */
 async function main() {
-  // CHALLENGE 24: Implement main function
-  // 1. Display an initialization message
-  // 2. Call initialize() to set up the application
-  // 3. Handle initialization failure (exit with error code 1)
-  // 4. Display a welcome message on success
-  // 5. Start the main menu loop by calling showMainMenu()
-  // 6. Add error handling for any uncaught exceptions
+  console.log('Initializing application...');
+  const initialized = await initialize();
 
-  try {
-    console.log('Initializing application...');
-    const initialized = await initialize();
-
-    if (!initialized) {
-      console.error('Initialization failed');
-      process.exit(1);
-    }
-
-    console.log('Welcome to Recipe Explorer!');
-    await showMainMenu();
-  } catch (error) {
-    console.error('Fatal error:', error);
+  if (!initialized) {
+    console.error('Initialization failed');
     process.exit(1);
   }
+
+  console.log('Welcome to Recipe Explorer!');
+  await showMainMenu();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
